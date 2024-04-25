@@ -1,17 +1,17 @@
 package main
 
 import (
-	"assignment1/internal/data"
-	"encoding/json"
+	"assignment1/handlers"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/pressly/goose"
 	"log"
 	"net/http"
-	"time"
+	"net/smtp"
+	"os"
+
+	"github.com/gorilla/mux"
+	"github.com/pressly/goose"
 
 	"database/sql"
-	// Import PostgreSQL driver
 	_ "github.com/lib/pq"
 )
 
@@ -24,9 +24,6 @@ const (
 )
 
 var db *sql.DB
-
-// My connection string:
-// "host=localhost port=5432 user=postgres password=123456 dbname=d.mukhamedinDB sslmode=disable"
 
 func main() {
 	// DB connection
@@ -50,108 +47,62 @@ func main() {
 		log.Fatalf("Migration applying error: %v", err)
 	}
 
-	// goose -dir migrations postgres "host=localhost port=5432 user=postgres password=123456 dbname=d.mukhamedinDB sslmode=disable" up
-	// goose -dir migrations postgres "host=localhost port=5432 user=postgres password=123456 dbname=d.mukhamedinDB sslmode=disable" down
+	// Sending welcome email
+	err = sendWelcomeEmail("brainwin0@gmail.com")
+	if err != nil {
+		log.Println("Error sending welcome email:", err)
+	}
+
+	fmt.Println("Welcome email sent successfully")
 
 	r := mux.NewRouter()
-	r.HandleFunc("/module/{id}", getModuleInfo).Methods("GET")
-	r.HandleFunc("/module", createModuleInfo).Methods("POST")
-	r.HandleFunc("/module/{id}", updateModuleInfo).Methods("PUT")
-	r.HandleFunc("/module/{id}", deleteModuleInfo).Methods("DELETE")
+
+	// Module handlers
+	moduleRouter := r.PathPrefix("/module").Subrouter()
+	moduleRouter.HandleFunc("/{id}", handlers.GetModuleInfo(db)).Methods("GET")
+	moduleRouter.HandleFunc("/", handlers.CreateModuleInfo(db)).Methods("POST")
+	moduleRouter.HandleFunc("/{id}", handlers.UpdateModuleInfo(db)).Methods("PUT")
+	moduleRouter.HandleFunc("/{id}", handlers.DeleteModuleInfo(db)).Methods("DELETE")
+
+	// User handlers
+	userRouter := r.PathPrefix("/user").Subrouter()
+	userRouter.HandleFunc("/", handlers.CreateUserInfoHandler(db)).Methods("POST")
+	userRouter.HandleFunc("/{id}", handlers.GetUserInfoHandler(db)).Methods("GET")
+	userRouter.HandleFunc("/{id}", handlers.EditUserInfoHandler(db)).Methods("PUT")
+	userRouter.HandleFunc("/{id}", handlers.DeleteUserInfoHandler(db)).Methods("DELETE")
 
 	log.Println("Server is listening on :8080")
 	http.ListenAndServe(":8080", r)
 }
 
-func createModuleInfo(w http.ResponseWriter, r *http.Request) {
-	var module data.ModuleInfo
-	err := json.NewDecoder(r.Body).Decode(&module)
-	if err != nil {
-		http.Error(w, "Error during module reading", http.StatusBadRequest)
-		return
+func sendWelcomeEmail(email string) error {
+	from := os.Getenv("SENDER_EMAIL")
+	if from == "" {
+		return fmt.Errorf("SENDER_EMAIL environment variable is not set")
+	}
+	fmt.Println(os.Getenv("SENDER_EMAIL"))
+
+	password := os.Getenv("SENDER_PASSWORD")
+	if password == "" {
+		return fmt.Errorf("SENDER_PASSWORD environment variable is not set")
 	}
 
-	module.CreatedAt = time.Now()
-	module.UpdatedAt = time.Now()
+	to := email
 
-	// Execute SQL statement to insert data
-	_, err = db.Exec("INSERT INTO module_info (module_name, module_duration, exam_type, version, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
-		module.ModuleName, module.ModuleDuration, module.ExamType, module.Version, module.CreatedAt, module.UpdatedAt)
-	if err != nil {
-		http.Error(w, "Error during module creation", http.StatusInternalServerError)
-		return
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	if smtpHost == "" || smtpPort == "" {
+		return fmt.Errorf("SMTP_HOST or SMTP_PORT environment variables are not set")
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(module)
-}
+	message := []byte(fmt.Sprintf("Welcome!"))
 
-func getModuleInfo(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
+	auth := smtp.PlainAuth("", from, password, smtpHost)
 
-	var module data.ModuleInfo
-
-	// Execute SQL query to fetch data
-	row := db.QueryRow("SELECT * FROM module_info WHERE id = $1", id)
-	err := row.Scan(&module.ID, &module.ModuleName, &module.ModuleDuration, &module.ExamType, &module.Version, &module.CreatedAt, &module.UpdatedAt)
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, message)
 	if err != nil {
-		http.Error(w, "Module not found", http.StatusNotFound)
-		return
+		return err
 	}
 
-	json.NewEncoder(w).Encode(module)
-}
-
-func updateModuleInfo(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
-
-	var module data.ModuleInfo
-
-	// Execute SQL query to fetch data
-	row := db.QueryRow("SELECT * FROM module_info WHERE id = $1", id)
-	err := row.Scan(&module.ID, &module.ModuleName, &module.ModuleDuration, &module.ExamType, &module.Version, &module.CreatedAt, &module.UpdatedAt)
-	if err != nil {
-		http.Error(w, "Module not found", http.StatusNotFound)
-		return
-	}
-
-	var updatedModule data.ModuleInfo
-	err = json.NewDecoder(r.Body).Decode(&updatedModule)
-	if err != nil {
-		http.Error(w, "Error retrieving module", http.StatusBadRequest)
-		return
-	}
-
-	// Update the module info
-	module.ModuleName = updatedModule.ModuleName
-	module.ModuleDuration = updatedModule.ModuleDuration
-	module.ExamType = updatedModule.ExamType
-	module.Version = updatedModule.Version
-	module.UpdatedAt = time.Now()
-
-	// Execute SQL statement to update data
-	_, err = db.Exec("UPDATE module_info SET module_name=$1, module_duration=$2, exam_type=$3, version=$4, updated_at=$5 WHERE id=$6",
-		module.ModuleName, module.ModuleDuration, module.ExamType, module.Version, module.UpdatedAt, id)
-	if err != nil {
-		http.Error(w, "Error updating module", http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(module)
-}
-
-func deleteModuleInfo(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
-
-	// Execute SQL statement to delete data
-	_, err := db.Exec("DELETE FROM module_info WHERE id=$1", id)
-	if err != nil {
-		http.Error(w, "Error deleting module", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
