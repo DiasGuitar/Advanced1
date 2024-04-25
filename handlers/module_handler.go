@@ -21,7 +21,6 @@ func CreateModuleInfo(db *sql.DB) http.HandlerFunc {
 		module.CreatedAt = time.Now()
 		module.UpdatedAt = time.Now()
 
-		// Execute SQL statement to insert data
 		_, err = db.Exec("INSERT INTO module_info (module_name, module_duration, exam_type, version, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
 			module.ModuleName, module.ModuleDuration, module.ExamType, module.Version, module.CreatedAt, module.UpdatedAt)
 		if err != nil {
@@ -41,7 +40,6 @@ func GetModuleInfo(db *sql.DB) http.HandlerFunc {
 
 		var module data.ModuleInfo
 
-		// Execute SQL query to fetch data
 		row := db.QueryRow("SELECT * FROM module_info WHERE id = $1", id)
 		err := row.Scan(&module.ID, &module.ModuleName, &module.ModuleDuration, &module.ExamType, &module.Version, &module.CreatedAt, &module.UpdatedAt)
 		if err != nil {
@@ -60,7 +58,6 @@ func UpdateModuleInfo(db *sql.DB) http.HandlerFunc {
 
 		var module data.ModuleInfo
 
-		// Execute SQL query to fetch data
 		row := db.QueryRow("SELECT * FROM module_info WHERE id = $1", id)
 		err := row.Scan(&module.ID, &module.ModuleName, &module.ModuleDuration, &module.ExamType, &module.Version, &module.CreatedAt, &module.UpdatedAt)
 		if err != nil {
@@ -75,14 +72,12 @@ func UpdateModuleInfo(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Update the module info
 		module.ModuleName = updatedModule.ModuleName
 		module.ModuleDuration = updatedModule.ModuleDuration
 		module.ExamType = updatedModule.ExamType
 		module.Version = updatedModule.Version
 		module.UpdatedAt = time.Now()
 
-		// Execute SQL statement to update data
 		_, err = db.Exec("UPDATE module_info SET module_name=$1, module_duration=$2, exam_type=$3, version=$4, updated_at=$5 WHERE id=$6",
 			module.ModuleName, module.ModuleDuration, module.ExamType, module.Version, module.UpdatedAt, id)
 		if err != nil {
@@ -99,7 +94,6 @@ func DeleteModuleInfo(db *sql.DB) http.HandlerFunc {
 		params := mux.Vars(r)
 		id := params["id"]
 
-		// Execute SQL statement to delete data
 		_, err := db.Exec("DELETE FROM module_info WHERE id=$1", id)
 		if err != nil {
 			http.Error(w, "Error deleting module", http.StatusInternalServerError)
