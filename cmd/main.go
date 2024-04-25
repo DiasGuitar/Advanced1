@@ -26,7 +26,6 @@ const (
 var db *sql.DB
 
 func main() {
-	// DB connection
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, user, password, dbname, port)
 	var err error
 	db, err = sql.Open("postgres", dsn)
@@ -76,6 +75,7 @@ func main() {
 }
 
 func sendWelcomeEmail(email string) error {
+
 	from := os.Getenv("SENDER_EMAIL")
 	if from == "" {
 		return fmt.Errorf("SENDER_EMAIL environment variable is not set")
