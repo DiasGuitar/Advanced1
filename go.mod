@@ -3,8 +3,15 @@ module assignment1
 go 1.21.5
 
 require (
-	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/gorilla/mux v1.8.1
+	github.com/lib/pq v1.10.9
+	github.com/pressly/goose v2.7.0+incompatible
+	github.com/stretchr/testify v1.9.0
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pressly/goose v2.7.0+incompatible // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
